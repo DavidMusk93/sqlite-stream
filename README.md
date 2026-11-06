@@ -12,6 +12,8 @@ counts reject incomplete archives. SQLite is bundled; no application SDK is need
 ```bash
 cargo test
 cargo run -- inspect path/to/database.db
+cargo run -- backup path/to/database.db snapshot.sqls.zst
+cargo run -- backup path/to/database.db - > snapshot.sqls.zst
 ```
 
 Discovery must share a read transaction with later data traversal. UTF-8
@@ -21,5 +23,8 @@ budgets; these are independent of total database size.
 
 ## Implementation status
 
-The discovery command and codec are implemented. The backup/restore pipeline,
-resource validation and publication are subsequent feature commits.
+Discovery, the binary codec and compressed snapshot backup are implemented.
+Backup uses one read transaction, borrowed row values and an 8 MiB Zstandard
+window. Integrity and foreign key checks run before any archive bytes are emitted.
+File output is staged and published without overwriting an existing path.
+Restore, resource validation and publication are subsequent feature commits.
