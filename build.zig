@@ -42,6 +42,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const sqlite = b.option([]const u8, "sqlite-dir", "Verified SQLite amalgamation") orelse @panic("use scripts/build.sh");
     const zstd = b.option([]const u8, "zstd-dir", "Verified Zstandard lib directory") orelse @panic("use scripts/build.sh");
+    b.modules.put(b.allocator, b.dupe("sqlite_stream"), library(b, b.path("."), target, optimize, sqlite, zstd)) catch @panic("out of memory");
     b.installArtifact(b.addExecutable(.{ .name = "sqlite-stream", .root_module = module(b, b.path("."), "src/main.zig", target, optimize, sqlite, zstd) }));
     const tests = b.addTest(.{ .root_module = module(b, b.path("."), "src/tests.zig", target, optimize, sqlite, zstd) });
     b.step("test", "Run native contract tests").dependOn(&b.addRunArtifact(tests).step);

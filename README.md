@@ -63,6 +63,10 @@ complete destination exists but crash durability is uncertain.
 `build.zig` exports `library(b, source_root, target, optimize, sqlite_dir, zstd_dir)`.
 Import its module as `sqlite_stream`; it compiles the pinned SQLite and Zstandard
 once, so the consuming executable must not compile a second amalgamation.
+For a local Zig package dependency, set `.sqlite_stream = .{ .path = "../sqlite_stream" }`
+in the consumer's `build.zig.zon`, pass `target`, `optimize`, `sqlite-dir` and
+`zstd-dir` to `b.dependency("sqlite_stream", ...)`, and import
+`dependency.module("sqlite_stream")`. The package also exposes the CLI artifact.
 `src/lib.zig` exposes `Control`, `Limits`, `Report`, `Db`, `backup(path, fd, control)`
 and `restore(input_fd, output_path, output_fd, control)`.
 

@@ -1,0 +1,7 @@
+.{
+    .name = .sqlite_stream,
+    .fingerprint = 0x616b0af148621d0a,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.17.1",
+    .paths = .{ "build.zig", "build.zig.zon", "src", "scripts", "tests", "docs", "README.md", "LICENSE" },
+}
