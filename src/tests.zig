@@ -9,6 +9,44 @@ const stream = @import("stream.zig");
 const format = @import("format.zig");
 const c = p.c;
 
+test "embedded API uses the same codec and caller-owned restore file" {
+    const lib = @import("lib.zig");
+    var control = try lib.Control.init(.{});
+    defer control.deinit();
+    var source = try staging.Stage.init("/tmp");
+    defer source.deinit();
+    {
+        const db = try lib.Db.open(source.path, true, &control);
+        defer db.close();
+        try db.exec("CREATE TABLE x(v); INSERT INTO x VALUES(1),(x'00ff')");
+    }
+    var archive = try staging.Stage.init("/tmp");
+    defer archive.deinit();
+    const expected = try lib.backup(source.path, archive.fd, &control);
+    try rewind(archive.fd);
+    var target = try staging.Stage.init("/tmp");
+    defer target.deinit();
+    try std.testing.expectEqual(expected, try lib.restore(archive.fd, target.path, target.fd, &control));
+}
+
+test "descriptor VFS keeps SQLite filenames bound to the opened directory" {
+    if (@import("builtin").os.tag != .linux) return error.SkipZigTest;
+    var control = try p.Control.init(.{});
+    defer control.deinit();
+    var stage = try staging.Stage.init("/tmp");
+    defer stage.deinit();
+    const fd = c.open(stage.directory.ptr, c.O_RDONLY | c.O_DIRECTORY | c.O_CLOEXEC, @as(c_uint, 0));
+    if (fd < 0) return error.Open;
+    defer _ = c.close(fd);
+    const path = try std.fmt.allocPrint(p.allocator, "/proc/self/fd/{d}/database", .{fd});
+    defer p.allocator.free(path);
+    const db = try s.Db.open(path, true, &control);
+    defer db.close();
+    try db.exec("CREATE TABLE x(v); INSERT INTO x VALUES(7)");
+    try std.testing.expectEqualStrings(path, std.mem.span(c.sqlite3_db_filename(db.handle, "main")));
+    try std.testing.expectEqual(@as(i64, 7), try db.scalar("SELECT v FROM x"));
+}
+
 test "discover rowids generated columns strict without rowid and original DDL" {
     var control = try p.Control.init(.{});
     defer control.deinit();

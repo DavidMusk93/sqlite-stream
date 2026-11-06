@@ -81,6 +81,11 @@ fn bind(stmt: s.Stmt, cells: []const format.Cell) !void {
     }
 }
 pub fn load(input: *p.Fd, stage: *staging.Stage, control: *const p.Control) !format.Report {
+    return loadInto(input, stage.path, stage.fd, control);
+}
+/// Caller owns an exclusively created, empty file in a private directory.
+/// It must remove the file and SQLite sidecars on failure, and publish only on success.
+pub fn loadInto(input: *p.Fd, path: []const u8, fd: c_int, control: *const p.Control) !format.Report {
     try control.check();
     var reader = try stream.Reader.init(input);
     defer reader.deinit();
@@ -89,7 +94,7 @@ pub fn load(input: *p.Fd, stage: *staging.Stage, control: *const p.Control) !for
     defer p.allocator.free(catalog_buf);
     var catalog_allocator: std.heap.FixedBufferAllocator = .init(catalog_buf);
     const catalog = try decoder.header(catalog_allocator.allocator());
-    const db = try s.Db.open(stage.path, true, control);
+    const db = try s.Db.open(path, true, control);
     defer db.close();
     const pages = control.limits.database_bytes / @as(u64, @intCast(try db.scalar("PRAGMA page_size")));
     if (pages == 0) return error.DatabaseBudget;
@@ -135,7 +140,7 @@ pub fn load(input: *p.Fd, stage: *staging.Stage, control: *const p.Control) !for
     if (!p.eql(&report.digest, &actual.digest) or report.rows != actual.rows) return error.ContentMismatch;
     try db.exec("COMMIT");
     committed = true;
-    try stage.sync();
+    if (c.fsync(fd) != 0) return error.Sync;
     try control.check();
     return report;
 }

@@ -1,4 +1,28 @@
 #include "abi.h"
+#include <string.h>
+
+/* Keep descriptor-relative paths intact. Canonicalizing /proc/self/fd would
+ * allow an unmounted data path to resolve to its underlying root filesystem.
+ * The caller serializes registration; all IO and locking use SQLite's VFS. */
+static int fd_fullpath(sqlite3_vfs *vfs, const char *path, int size, char *out) {
+    (void)vfs;
+    if (strncmp(path, "/proc/self/fd/", 14) || strlen(path) >= (size_t)size)
+        return SQLITE_CANTOPEN;
+    memcpy(out, path, strlen(path) + 1);
+    return SQLITE_OK;
+}
+int ss_register_fd_vfs(void) {
+    static sqlite3_vfs fd_vfs;
+    if (sqlite3_initialize() != SQLITE_OK) return SQLITE_ERROR;
+    if (sqlite3_vfs_find("ss-fd")) return SQLITE_OK;
+    sqlite3_vfs *base = sqlite3_vfs_find(0);
+    if (!base) return SQLITE_ERROR;
+    fd_vfs = *base;
+    fd_vfs.zName = "ss-fd";
+    fd_vfs.pNext = 0;
+    fd_vfs.xFullPathname = fd_fullpath;
+    return sqlite3_vfs_register(&fd_vfs, 0);
+}
 
 static volatile sig_atomic_t cancelled;
 static void cancel(int signal_number) { (void)signal_number; cancelled = 1; }

@@ -58,6 +58,22 @@ directory must be trusted and the filesystem must support hard links and
 directory synchronization. A `PublishedButDirectorySyncFailed` error means the
 complete destination exists but crash durability is uncertain.
 
+## Embedding
+
+`build.zig` exports `library(b, source_root, target, optimize, sqlite_dir, zstd_dir)`.
+Import its module as `sqlite_stream`; it compiles the pinned SQLite and Zstandard
+once, so the consuming executable must not compile a second amalgamation.
+`src/lib.zig` exposes `Control`, `Limits`, `Report`, `Db`, `backup(path, fd, control)`
+and `restore(input_fd, output_path, output_fd, control)`.
+
+The caller owns private staging, file identity checks, cleanup, synchronization,
+publication and replication. Restore requires an exclusively created empty file
+whose path identifies its output descriptor. It never publishes that file.
+Linux `/proc/self/fd/<directory>/<name>` database paths use a VFS that preserves
+the descriptor-relative name instead of canonicalizing it. VFS initialization
+must be serialized. Signal handlers are installed only by an explicit
+`initSignals()` call.
+
 ## Resource limits
 
 The default limits are 8 MiB per encoded row, 4 MiB schema and one hour elapsed

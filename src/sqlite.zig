@@ -13,7 +13,11 @@ pub const Db = struct {
         defer p.allocator.free(path_z);
         var handle: ?*c.sqlite3 = null;
         const flags = if (writable) c.SQLITE_OPEN_READWRITE | c.SQLITE_OPEN_CREATE else c.SQLITE_OPEN_READONLY;
-        if (c.sqlite3_open_v2(path_z, &handle, flags | c.SQLITE_OPEN_NOMUTEX, null) != c.SQLITE_OK) {
+        const vfs: ?[*:0]const u8 = if (std.mem.startsWith(u8, path, "/proc/self/fd/")) blk: {
+            if (c.ss_register_fd_vfs() != c.SQLITE_OK) return error.SQLiteVFS;
+            break :blk "ss-fd";
+        } else null;
+        if (c.sqlite3_open_v2(path_z, &handle, flags | c.SQLITE_OPEN_NOMUTEX, vfs) != c.SQLITE_OK) {
             if (handle) |h| _ = c.sqlite3_close(h);
             return error.SQLiteOpen;
         }
