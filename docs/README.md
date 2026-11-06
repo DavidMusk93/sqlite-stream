@@ -4,6 +4,7 @@
 
 - [Archive format](format.md): encoding, deterministic traversal and validation.
 - [Security and resources](security.md): trust boundaries and failure behavior.
+- [Dependency licenses](licenses.md): notices included with portable binaries.
 
 ## Validation
 
