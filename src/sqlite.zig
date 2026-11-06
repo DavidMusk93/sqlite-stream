@@ -1,6 +1,15 @@
 const std = @import("std");
 const p = @import("platform.zig");
 pub const c = p.c;
+fn failure(rc: c_int) anyerror {
+    return switch (rc & 0xff) {
+        c.SQLITE_FULL => error.DatabaseBudget,
+        c.SQLITE_BUSY, c.SQLITE_LOCKED => error.SQLiteBusy,
+        c.SQLITE_IOERR, c.SQLITE_NOMEM => error.SQLiteIO,
+        c.SQLITE_INTERRUPT => if (c.ss_cancelled() != 0) error.Cancelled else error.Deadline,
+        else => error.SQLiteStep,
+    };
+}
 fn progress(context: ?*anyopaque) callconv(.c) c_int {
     const control: *const p.Control = @ptrCast(@alignCast(context.?));
     control.check() catch return 1;
@@ -36,9 +45,11 @@ pub const Db = struct {
     pub fn exec(self: Db, sql: []const u8) !void {
         const sql_z = try p.z(sql);
         defer p.allocator.free(sql_z);
-        if (c.sqlite3_exec(self.handle, sql_z, null, null, null) != c.SQLITE_OK) {
+        const rc = c.sqlite3_exec(self.handle, sql_z, null, null, null);
+        if (rc != c.SQLITE_OK) {
             p.log("sqlite: {s}", .{std.mem.span(c.sqlite3_errmsg(self.handle))});
-            return error.SQLiteExec;
+            const err = failure(rc);
+            return if (err == error.SQLiteStep) error.SQLiteExec else err;
         }
     }
     pub fn prepare(self: Db, sql: []const u8) !Stmt {
@@ -84,7 +95,7 @@ pub const Stmt = struct {
         if (rc == c.SQLITE_ROW) return true;
         if (rc == c.SQLITE_DONE) return false;
         p.log("sqlite: {s}", .{std.mem.span(c.sqlite3_errmsg(c.sqlite3_db_handle(self.handle)))});
-        return error.SQLiteStep;
+        return failure(rc);
     }
     pub fn text(self: Stmt, col: c_int) ![]const u8 {
         const ptr = c.sqlite3_column_text(self.handle, col);

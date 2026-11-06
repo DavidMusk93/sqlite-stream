@@ -27,6 +27,11 @@ test "embedded API uses the same codec and caller-owned restore file" {
     var target = try staging.Stage.init("/tmp");
     defer target.deinit();
     try std.testing.expectEqual(expected, try lib.restore(archive.fd, target.path, target.fd, &control));
+    try rewind(archive.fd);
+    var limited = try staging.Stage.init("/tmp");
+    defer limited.deinit();
+    control.limits.database_bytes = 4096;
+    try std.testing.expectError(error.DatabaseBudget, lib.restore(archive.fd, limited.path, limited.fd, &control));
 }
 
 test "descriptor VFS keeps SQLite filenames bound to the opened directory" {
