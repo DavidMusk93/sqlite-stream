@@ -234,7 +234,12 @@ impl<R: Read> Decoder<R> {
         Ok(Some(cells))
     }
 
-    pub fn finish(mut self) -> Result<([u8; 32], u64)> {
+    pub fn finish(self) -> Result<([u8; 32], u64)> {
+        let (_, digest, rows) = self.finish_with_reader()?;
+        Ok((digest, rows))
+    }
+
+    pub fn finish_with_reader(mut self) -> Result<(R, [u8; 32], u64)> {
         ensure!(&self.bytes::<8>()? == END, "missing complete footer");
         let expected = u64::from_le_bytes(self.bytes()?);
         ensure!(expected == self.total_rows, "total row count mismatch");
@@ -245,6 +250,6 @@ impl<R: Read> Decoder<R> {
             .context("truncated digest")?;
         ensure!(digest == actual, "archive SHA-256 mismatch");
         ensure!(self.reader.read(&mut [0])? == 0, "trailing archive data");
-        Ok((actual, self.total_rows))
+        Ok((self.reader, actual, self.total_rows))
     }
 }

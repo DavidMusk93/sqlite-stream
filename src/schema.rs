@@ -63,6 +63,76 @@ pub struct Catalog {
     pub tables: Vec<Table>,
 }
 
+impl Catalog {
+    pub fn validate(&self, limits: Limits) -> Result<()> {
+        ensure!(
+            i32::try_from(self.user_version).is_ok(),
+            "invalid user_version"
+        );
+        ensure!(
+            i32::try_from(self.application_id).is_ok(),
+            "invalid application_id"
+        );
+        ensure!(
+            self.objects.len() <= 10_000 && self.tables.len() <= 10_000,
+            "too many schema items"
+        );
+        let mut bytes = 0;
+        let mut objects = std::collections::BTreeSet::new();
+        for object in &self.objects {
+            ensure!(
+                matches!(object.kind.as_str(), "table" | "index" | "view" | "trigger"),
+                "unsupported object kind"
+            );
+            ensure!(
+                !object.name.is_empty()
+                    && !object.name.contains('\0')
+                    && !object.name.starts_with("sqlite_"),
+                "invalid object name"
+            );
+            ensure!(
+                objects.insert((&object.kind, &object.name)),
+                "duplicate schema object"
+            );
+            charge(
+                &mut bytes,
+                object.name.len() + object.sql.len() + 128,
+                limits,
+            )?;
+        }
+        let mut tables = std::collections::BTreeSet::new();
+        for table in &self.tables {
+            ensure!(tables.insert(&table.name), "duplicate archive table");
+            ensure!(
+                !table.name.is_empty() && !table.name.contains('\0'),
+                "invalid table name"
+            );
+            ensure!(
+                !table.columns.is_empty() && table.columns.len() <= 2001,
+                "invalid column count"
+            );
+            ensure!(
+                !table.order.is_empty() && table.order.len() <= table.columns.len(),
+                "invalid row order"
+            );
+            let mut columns = std::collections::BTreeSet::new();
+            for name in &table.columns {
+                ensure!(
+                    !name.is_empty() && !name.contains('\0') && columns.insert(name),
+                    "invalid or duplicate column"
+                );
+                charge(&mut bytes, name.len() * 3 + 64, limits)?;
+            }
+            ensure!(
+                table.order.iter().all(|name| columns.contains(name)),
+                "invalid ordering column"
+            );
+            charge(&mut bytes, table.name.len() + 128, limits)?;
+        }
+        Ok(())
+    }
+}
+
 pub fn quote(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }

@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use rusqlite::{Connection, OpenFlags};
 use std::{io, path::PathBuf};
 
-use sqlite_stream::{Limits, backup, schema};
+use sqlite_stream::{Limits, backup, restore, schema};
 
 #[derive(Parser)]
 #[command(version, about = "Schema-aware SQLite backup and restore streams")]
@@ -18,6 +18,14 @@ enum Command {
     Inspect { database: PathBuf },
     /// Stream a consistent logical snapshot; use '-' to write the archive to stdout.
     Backup { database: PathBuf, output: PathBuf },
+    /// Restore a fully verified archive to a new database; input '-' reads stdin.
+    Restore { input: PathBuf, database: PathBuf },
+    /// Verify an archive with a full scratch restore.
+    Verify {
+        input: PathBuf,
+        #[arg(long)]
+        scratch: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -46,6 +54,28 @@ fn main() -> Result<()> {
                 report
             };
             eprintln!("backed up {} rows in {} tables", report.rows, report.tables);
+        }
+        Command::Restore { input, database } => {
+            let reader: Box<dyn io::Read> = if input.as_os_str() == "-" {
+                Box::new(io::stdin().lock())
+            } else {
+                Box::new(std::fs::File::open(input)?)
+            };
+            let report = restore::restore(reader, &database, Limits::default())?;
+            eprintln!("restored {} rows in {} tables", report.rows, report.tables);
+        }
+        Command::Verify { input, scratch } => {
+            let reader: Box<dyn io::Read> = if input.as_os_str() == "-" {
+                Box::new(io::stdin().lock())
+            } else {
+                Box::new(std::fs::File::open(input)?)
+            };
+            let report = restore::verify(
+                reader,
+                &scratch.unwrap_or_else(std::env::temp_dir),
+                Limits::default(),
+            )?;
+            eprintln!("verified {} rows in {} tables", report.rows, report.tables);
         }
     }
     Ok(())

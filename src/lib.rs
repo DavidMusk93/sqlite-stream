@@ -1,5 +1,6 @@
 pub mod backup;
 pub mod format;
+pub mod restore;
 pub mod schema;
 
 /// Limits apply to SQLite records and uncompressed archive metadata, not database size.
