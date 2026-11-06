@@ -2,7 +2,16 @@ name: Portable executables
 
 on:
   push:
+    branches: ["master"]
     tags: ["v*"]
+    paths:
+      - ".github/workflows/release.yml"
+      - "build.zig"
+      - "scripts/**"
+      - "src/**"
+      - "LICENSE"
+      - "README.md"
+      - "docs/**"
   workflow_dispatch:
 
 permissions:
