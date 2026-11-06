@@ -24,10 +24,6 @@ int ss_file_size(const char *path, uint64_t *size) {
     *size = (uint64_t)s.st_size;
     return 0;
 }
-int ss_regular(int fd) {
-    struct stat s;
-    return fstat(fd, &s) == 0 && S_ISREG(s.st_mode);
-}
 int ss_exists(const char *path) {
     struct stat s;
     if (lstat(path, &s) == 0) return 1;

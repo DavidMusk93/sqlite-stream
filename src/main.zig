@@ -54,7 +54,19 @@ fn run(init: std.process.Init) !void {
         if (p.eql(option, "--timeout-seconds")) {
             if (number == 0 or number > 7 * 86400) return error.InvalidBudget;
             limits.timeout_ms = @intCast(number * 1000);
-        } else if (p.eql(option, "--max-archive-bytes")) limits.archive_bytes = number else if (p.eql(option, "--max-database-bytes")) limits.database_bytes = number else if (p.eql(option, "--max-rows")) limits.rows = number else if (p.eql(option, "--max-wal-bytes")) limits.wal_bytes = number else if (p.eql(option, "--max-row-bytes")) limits.row_bytes = std.math.cast(usize, number) orelse return error.InvalidBudget else return error.UnknownOption;
+        } else if (p.eql(option, "--max-archive-bytes")) {
+            limits.archive_bytes = number;
+        } else if (p.eql(option, "--max-database-bytes")) {
+            limits.database_bytes = number;
+        } else if (p.eql(option, "--max-rows")) {
+            limits.rows = number;
+        } else if (p.eql(option, "--max-wal-bytes")) {
+            limits.wal_bytes = number;
+        } else if (p.eql(option, "--max-row-bytes")) {
+            limits.row_bytes = std.math.cast(usize, number) orelse return error.InvalidBudget;
+        } else {
+            return error.UnknownOption;
+        }
     }
     var control = try p.Control.init(limits);
     defer control.deinit();
