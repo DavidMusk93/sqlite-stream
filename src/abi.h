@@ -18,3 +18,4 @@ int ss_cancelled(void);
 void ss_signals(void);
 int ss_file_size(const char *path, uint64_t *size);
 int ss_regular(int fd);
+int ss_exists(const char *path);
