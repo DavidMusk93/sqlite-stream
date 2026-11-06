@@ -1,0 +1,32 @@
+name: Native contracts
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Build and test Zig
+        env:
+          SQLITE_STREAM_CACHE: ${{ runner.temp }}/sqlite-stream-cache
+          SQLITE_STREAM_OUTPUT: ${{ runner.temp }}/sqlite-stream-output
+        run: |
+          bash scripts/build.sh test
+          bash scripts/build.sh native
+      - name: Test CLI and snapshot failures
+        run: |
+          uv venv "${{ runner.temp }}/test-env" --python 3.12
+          "${{ runner.temp }}/test-env/bin/python" tests/test_cli.py \
+            "${{ runner.temp }}/sqlite-stream-output/native/bin/sqlite-stream"

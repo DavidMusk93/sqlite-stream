@@ -1,0 +1,49 @@
+name: Portable executables
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build four platforms
+        env:
+          SQLITE_STREAM_CACHE: ${{ runner.temp }}/sqlite-stream-cache
+          SQLITE_STREAM_OUTPUT: ${{ runner.temp }}/sqlite-stream-output
+        run: bash scripts/build.sh release
+      - name: Require static Linux executables
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in x86_64-linux-musl aarch64-linux-musl; do
+            binary="${{ runner.temp }}/sqlite-stream-output/$target/bin/sqlite-stream"
+            readelf -l "$binary" > "${{ runner.temp }}/programs.txt"
+            readelf -d "$binary" > "${{ runner.temp }}/dynamic.txt"
+            if grep -q INTERP "${{ runner.temp }}/programs.txt"; then exit 1; else test "$?" -eq 1; fi
+            if grep -q NEEDED "${{ runner.temp }}/dynamic.txt"; then exit 1; else test "$?" -eq 1; fi
+          done
+      - name: Package executables with permissions and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="${{ runner.temp }}/packages"
+          mkdir -p "$package"
+          for target in x86_64-linux-musl aarch64-linux-musl x86_64-macos aarch64-macos; do
+            archive="$package/sqlite-stream-$target.tar.gz"
+            tar -czf "$archive" -C "${{ runner.temp }}/sqlite-stream-output/$target/bin" \
+              sqlite-stream sqlite-stream.sha256 -C "$GITHUB_WORKSPACE" LICENSE README.md docs
+            digest=$(sha256sum "$archive" | cut -d ' ' -f 1)
+            printf '%s  %s\n' "$digest" "$(basename "$archive")" >> "$package/SHA256SUMS"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sqlite-stream-portable
+          path: ${{ runner.temp }}/packages/
+          if-no-files-found: error
