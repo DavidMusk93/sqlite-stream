@@ -39,4 +39,6 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(b.addExecutable(.{ .name = "sqlite-stream", .root_module = module(b, "src/main.zig", target, optimize, sqlite, zstd) }));
     const tests = b.addTest(.{ .root_module = module(b, "src/tests.zig", target, optimize, sqlite, zstd) });
     b.step("test", "Run native contract tests").dependOn(&b.addRunArtifact(tests).step);
+    const install_tests = b.addInstallArtifact(tests, .{ .dest_sub_path = "sqlite-stream-tests" });
+    b.step("test-build", "Build contract tests for a remote target").dependOn(&install_tests.step);
 }

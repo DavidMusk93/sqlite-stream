@@ -13,8 +13,13 @@ action=${1:-native}
 common=(--build-file "$domain/build.zig" "-Dsqlite-dir=$sqlite" "-Dzstd-dir=$zstd")
 case "$action" in
   test)
-    "$zig" build test "${common[@]}" --cache-dir "$cache/native-cache"
+    "$zig" build test "${common[@]}" --cache-dir "$cache/native-cache" --summary all
     "$zig" fmt --check "$domain/build.zig" "$domain/src"
+    ;;
+  test-binary)
+    target=${2:-native}
+    "$zig" build test-build "${common[@]}" "-Dtarget=$target" -Doptimize=ReleaseSafe \
+      --cache-dir "$cache/$target-cache" --prefix "$output/$target"
     ;;
   native)
     "$zig" build "${common[@]}" -Doptimize=ReleaseSafe --cache-dir "$cache/native-cache" --prefix "$output/native"
@@ -29,5 +34,5 @@ case "$action" in
       printf '%s  sqlite-stream\n' "$digest" > "$binary.sha256"
     done
     ;;
-  *) echo "usage: bash scripts/build.sh [test|native|release]" >&2; exit 2 ;;
+  *) echo "usage: bash scripts/build.sh [test|test-binary TARGET|native|release]" >&2; exit 2 ;;
 esac
